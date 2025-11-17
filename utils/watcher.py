@@ -1,4 +1,4 @@
-"""Watch for code changes and auto-restart the bot."""
+"""Watch for git commits and auto-restart the bot."""
 
 import os
 import sys
@@ -13,42 +13,40 @@ from discord.ext import commands
 
 logger = logging.getLogger(__name__)
 
-class CodeChangeHandler(FileSystemEventHandler):
-    """Handle file system changes and trigger bot restart."""
+class GitCommitHandler(FileSystemEventHandler):
+    """Handle git commits and trigger bot restart."""
     
     def __init__(self, bot=None):
         self.bot = bot
-        self.last_modified = time.time()
-        self.cooldown = 2  # Prevent multiple restarts in quick succession
+        self.last_commit_time = time.time()
+        self.cooldown = 3  # Prevent multiple restarts in quick succession
+        self.git_dir = Path('.git')
         
     def on_modified(self, event):
         """Called when a file is modified."""
         if event.is_directory:
             return
         
-        # Only watch Python files
-        if not event.src_path.endswith('.py'):
-            return
+        # Only watch git index and HEAD files (these change on commits)
+        event_path = Path(event.src_path)
         
-        # Ignore __pycache__ and logs
-        if '__pycache__' in event.src_path or 'logs' in event.src_path:
-            return
-        
-        # Check cooldown
-        current_time = time.time()
-        if current_time - self.last_modified < self.cooldown:
-            return
-        
-        self.last_modified = current_time
-        
-        logger.warning(f"Code change detected: {event.src_path}")
-        logger.warning("Bot will restart in 3 seconds...")
-        
-        # Restart in a separate thread to avoid event loop issues
-        import threading
-        restart_thread = threading.Thread(target=self._restart_bot_sync)
-        restart_thread.daemon = True
-        restart_thread.start()
+        # Trigger on git index changes (happens during git operations)
+        if event_path.name in ['index', 'HEAD', 'COMMIT_EDITMSG']:
+            # Check if this is actually a commit (index file modification)
+            current_time = time.time()
+            if current_time - self.last_commit_time < self.cooldown:
+                return
+            
+            self.last_commit_time = current_time
+            
+            logger.warning("🔄 Git commit detected")
+            logger.warning("Bot will restart in 3 seconds...")
+            
+            # Restart in a separate thread to avoid event loop issues
+            import threading
+            restart_thread = threading.Thread(target=self._restart_bot_sync)
+            restart_thread.daemon = True
+            restart_thread.start()
     
     def _restart_bot_sync(self):
         """Synchronously restart the bot (called from separate thread)."""
@@ -89,19 +87,24 @@ class CodeChangeHandler(FileSystemEventHandler):
 
 
 def start_file_watcher(bot=None):
-    """Start watching for file changes."""
+    """Start watching for git commits."""
     try:
         from watchdog.observers import Observer
         from watchdog.events import FileSystemEventHandler
         
-        event_handler = CodeChangeHandler(bot)
+        # Check if .git directory exists
+        if not Path('.git').exists():
+            logger.warning("Git repository not found - auto-restart disabled")
+            return None
+        
+        event_handler = GitCommitHandler(bot)
         observer = Observer()
         
-        # Watch current directory and subdirectories
-        observer.schedule(event_handler, path='.', recursive=True)
+        # Watch only the .git directory for commits
+        observer.schedule(event_handler, path='.git', recursive=True)
         observer.start()
         
-        logger.info("File watcher started - bot will auto-restart on code changes")
+        logger.info("🔄 Git watcher started - bot will auto-restart on git commits")
         return observer
     except ImportError:
         logger.warning("watchdog not installed - auto-restart disabled")
