@@ -44,36 +44,48 @@ class CodeChangeHandler(FileSystemEventHandler):
         logger.warning(f"Code change detected: {event.src_path}")
         logger.warning("Bot will restart in 3 seconds...")
         
-        if self.bot:
-            # Schedule restart
-            import asyncio
-            asyncio.create_task(self.restart_bot_with_notification())
+        # Restart in a separate thread to avoid event loop issues
+        import threading
+        restart_thread = threading.Thread(target=self._restart_bot_sync)
+        restart_thread.daemon = True
+        restart_thread.start()
     
-    async def restart_bot_with_notification(self):
-        """Notify users and restart the bot."""
+    def _restart_bot_sync(self):
+        """Synchronously restart the bot (called from separate thread)."""
         try:
-            # Send notification to all connected guilds
-            if self.bot and hasattr(self.bot, 'guilds'):
-                for guild in self.bot.guilds:
-                    for channel in guild.text_channels:
-                        try:
-                            embed = discord.Embed(
-                                title="⚙️ Bot Update",
-                                description="Updating bot code... I'll be back in a few seconds!",
-                                color=discord.Color.blue()
-                            )
-                            await channel.send(embed=embed)
-                            break  # Send to first available channel per guild
-                        except Exception as e:
-                            logger.debug(f"Could not send notification: {e}")
-                            continue
+            # Wait before restarting
+            time.sleep(2)
+            
+            # Try to send notification if bot is available
+            if self.bot:
+                try:
+                    import asyncio
+                    # Try to schedule notification in bot's event loop if available
+                    for guild in self.bot.guilds:
+                        for channel in guild.text_channels:
+                            try:
+                                # Create task in bot's event loop
+                                future = asyncio.run_coroutine_threadsafe(
+                                    channel.send(embed=discord.Embed(
+                                        title="⚙️ Bot Restarting",
+                                        description="Updating bot code... I'll be back in a moment!",
+                                        color=discord.Color.blue()
+                                    )),
+                                    self.bot.loop
+                                )
+                                future.result(timeout=1)
+                                break  # Send to first available channel per guild
+                            except Exception as e:
+                                logger.debug(f"Could not send notification: {e}")
+                                continue
+                except Exception as e:
+                    logger.debug(f"Skipping notification: {e}")
         except Exception as e:
-            logger.error(f"Error sending update notification: {e}")
-        
-        # Wait a bit then restart
-        await asyncio.sleep(2)
-        logger.info("Restarting bot...")
-        os.execl(sys.executable, sys.executable, "bot.py")
+            logger.error(f"Error during restart: {e}")
+        finally:
+            # Restart the bot process
+            logger.info("Restarting bot...")
+            os.execl(sys.executable, sys.executable, "bot.py")
 
 
 def start_file_watcher(bot=None):
