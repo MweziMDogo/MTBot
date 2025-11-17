@@ -13,7 +13,11 @@ from commands.admin import setup_admin_commands
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('logs/bot.log'),
+        logging.StreamHandler()
+    ]
 )
 logger = logging.getLogger(__name__)
 
@@ -26,15 +30,28 @@ intents.members = True
 client = discord.Client(intents=intents)
 tree = app_commands.CommandTree(client)
 
+# File watcher for auto-restart
+watcher = None
+
 
 @client.event
 async def on_ready() -> None:
     """Called when the bot has finished logging in."""
+    global watcher
     try:
         await tree.sync()
         logger.info(f'Logged in as {client.user.name}#{client.user.discriminator} (ID: {client.user.id})')
+        
+        # Start file watcher only once
+        if watcher is None:
+            try:
+                from utils.watcher import start_file_watcher
+                watcher = start_file_watcher(client)
+            except ImportError:
+                logger.warning("watchdog not installed - auto-restart disabled. Install with: pip install watchdog")
     except Exception as e:
         logger.error(f"Failed to sync commands: {e}")
+
 
 
 async def setup_bot():

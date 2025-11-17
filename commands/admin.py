@@ -93,7 +93,7 @@ async def setup_admin_commands(tree: app_commands.CommandTree, client: discord.C
 
     @tree.command(name='admin_delete_listing', description='Delete any listing by ID (Admin only)')
     @app_commands.describe(listing_id='The listing ID to delete')
-    async def admin_delete_listing(interaction: discord.Interaction, listing_id: int):
+    async def admin_delete_listing(interaction: discord.Interaction, listing_id: int | None = None):
         """Delete any listing."""
         if not is_admin(interaction.user.id):
             await interaction.response.send_message(
@@ -151,7 +151,7 @@ async def setup_admin_commands(tree: app_commands.CommandTree, client: discord.C
 
     @tree.command(name='admin_clear_user_listings', description='Delete all listings from a user (Admin only)')
     @app_commands.describe(user_id='The Discord user ID to clear listings for')
-    async def admin_clear_user_listings(interaction: discord.Interaction, user_id: int):
+    async def admin_clear_user_listings(interaction: discord.Interaction, user_id: str):
         """Delete all listings from a specific user."""
         if not is_admin(interaction.user.id):
             await interaction.response.send_message(
@@ -161,9 +161,19 @@ async def setup_admin_commands(tree: app_commands.CommandTree, client: discord.C
             return
 
         try:
+            # Convert user_id string to int
+            try:
+                user_id_int = int(user_id)
+            except ValueError:
+                await interaction.response.send_message(
+                    f"❌ Invalid user ID: `{user_id}` - must be a valid Discord user ID",
+                    ephemeral=True
+                )
+                return
+            
             conn = sqlite3.connect('database/auction_house.db')
             cursor = conn.cursor()
-            cursor.execute('SELECT COUNT(*) FROM listings WHERE user_id = ?', (user_id,))
+            cursor.execute('SELECT COUNT(*) FROM listings WHERE user_id = ?', (user_id_int,))
             count = cursor.fetchone()[0]
             
             if count == 0:
@@ -184,7 +194,7 @@ async def setup_admin_commands(tree: app_commands.CommandTree, client: discord.C
                     try:
                         conn2 = sqlite3.connect('database/auction_house.db')
                         cursor2 = conn2.cursor()
-                        cursor2.execute('DELETE FROM listings WHERE user_id = ?', (user_id,))
+                        cursor2.execute('DELETE FROM listings WHERE user_id = ?', (user_id_int,))
                         conn2.commit()
                         conn2.close()
                         
@@ -219,7 +229,7 @@ async def setup_admin_commands(tree: app_commands.CommandTree, client: discord.C
 
     @tree.command(name='admin_edit_listing', description='Edit any listing by ID (Admin only)')
     @app_commands.describe(listing_id='The listing ID to edit', haves='New HAVE section (JSON format)', wants='New WANT section (JSON format)')
-    async def admin_edit_listing(interaction: discord.Interaction, listing_id: int, haves: Optional[str] = None, wants: Optional[str] = None):
+    async def admin_edit_listing(interaction: discord.Interaction, listing_id: int | None = None, haves: Optional[str] = None, wants: Optional[str] = None):
         """Edit any listing directly."""
         if not is_admin(interaction.user.id):
             await interaction.response.send_message(
