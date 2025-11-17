@@ -71,10 +71,28 @@ python bot.py
 - `/admin_listings` - View all listings in database
 - `/admin_delete_listing <id>` - Delete a specific listing
 - `/admin_clear_user_listings <user_id>` - Remove all listings from a user
-- `/admin_edit_listing <id>` - Edit listing content
+- `/admin_edit_listing <id>` - Edit listing with modal (simple format like `/create_listing`)
 - `/admin_add <user_id>` - Add a new admin (no restart needed)
 - `/admin_remove <user_id>` - Remove admin user
 - `/admin_list` - View all current admins
+
+### Admin Edit Listing Format
+When using `/admin_edit_listing`, the modal accepts the same format as `/create_listing`:
+
+**Simple format (comma-separated):**
+```
+Pet Rarity Quantity, Pet Rarity Quantity
+Example: Bramble Legendary 15, Mythic 2, Delve Legendary 5
+```
+
+**Or multiple lines:**
+```
+Bramble Legendary 15
+Mythic 2
+Delve Legendary 5
+```
+
+Zero quantities are automatically filtered out.
 
 ---
 

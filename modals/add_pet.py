@@ -342,21 +342,16 @@ class DeleteListingModal(ui.Modal, title="Delete Listing"):  # type: ignore
 
 
 class EditListingModal(ui.Modal, title="Edit Listing"):  # type: ignore
-    """Modal for admins to edit any listing (pre-filled with current data)."""
+    """Modal for admins to edit any listing (simple format like /create_listing)."""
     
     def __init__(self, listing_id: int, listing_data: Dict[str, Any]):
         super().__init__()
         self.listing_id = listing_id
         self.listing_data = listing_data
-        
-        # Pre-fill with current values
-        current_haves = listing_data.get('haves', '')
-        current_wants = listing_data.get('wants', '')
-        current_desc = listing_data.get('description', '') or ''
     
     haves = ui.TextInput(
-        label="Items They HAVE (JSON format)",
-        placeholder='{"PetName": {"Rarity": qty}} e.g. {"Delve": {"Legendary": 5}}',
+        label="Items They HAVE",
+        placeholder='Pet Rarity Quantity\ne.g. "Bramble Legendary 15, Mythic 2"',
         min_length=0,
         max_length=1000,
         required=False,
@@ -364,8 +359,8 @@ class EditListingModal(ui.Modal, title="Edit Listing"):  # type: ignore
     )
     
     wants = ui.TextInput(
-        label="Items They WANT (JSON format)",
-        placeholder='{"PetName": {"Rarity": qty}} e.g. {"Bramble": {"Mythic": 2}}',
+        label="Items They WANT",
+        placeholder='Pet Rarity Quantity\ne.g. "Aurelia Legendary 25, Delve Mythic 5"',
         min_length=0,
         max_length=1000,
         required=False,
@@ -384,26 +379,38 @@ class EditListingModal(ui.Modal, title="Edit Listing"):  # type: ignore
     async def on_submit(self, interaction: discord.Interaction) -> None:
         """Process the modal submission."""
         try:
-            # Parse JSON if provided
+            # Parse inputs using the same logic as /create_listing
             new_haves = None
             new_wants = None
             
             if self.haves.value.strip():
                 try:
-                    new_haves = json.loads(self.haves.value)
-                except json.JSONDecodeError:
+                    new_haves = parse_quantities(self.haves.value)
+                    if not new_haves:
+                        await interaction.response.send_message(
+                            "❌ No valid items in 'Items They HAVE' field.\nFormat: `Pet Rarity Quantity` (comma-separated)",
+                            ephemeral=True
+                        )
+                        return
+                except ValueError as e:
                     await interaction.response.send_message(
-                        "❌ Invalid JSON in 'Items They HAVE' field.\nExample: `{\"Delve\": {\"Legendary\": 5}}`",
+                        f"❌ Error parsing 'Items They HAVE': {str(e)}\nFormat: `Pet Rarity Quantity` (comma-separated)",
                         ephemeral=True
                     )
                     return
             
             if self.wants.value.strip():
                 try:
-                    new_wants = json.loads(self.wants.value)
-                except json.JSONDecodeError:
+                    new_wants = parse_quantities(self.wants.value)
+                    if not new_wants:
+                        await interaction.response.send_message(
+                            "❌ No valid items in 'Items They WANT' field.\nFormat: `Pet Rarity Quantity` (comma-separated)",
+                            ephemeral=True
+                        )
+                        return
+                except ValueError as e:
                     await interaction.response.send_message(
-                        "❌ Invalid JSON in 'Items They WANT' field.\nExample: `{\"Bramble\": {\"Mythic\": 2}}`",
+                        f"❌ Error parsing 'Items They WANT': {str(e)}\nFormat: `Pet Rarity Quantity` (comma-separated)",
                         ephemeral=True
                     )
                     return

@@ -24,13 +24,22 @@ python bot.py
 - `/how-to-trade` - Learn the trading process
 - `/pets` - View all available pets
 
+### Admin Commands (Restricted)
+- `/admin_listings` - View all listings
+- `/admin_delete_listing` - Remove a specific listing
+- `/admin_clear_user_listings` - Clear all listings from a user
+- `/admin_edit_listing` - Edit listing content using simple format
+- `/admin_add` - Add a new admin
+- `/admin_remove` - Remove an admin
+- `/admin_list` - View all admins
+
 ---
 
 ## 📁 Project Structure
 
 ```
 Miner Tycon Bot/
-├── bot.py                      Entry point (47 lines)
+├── bot.py                      Entry point with file watcher
 ├── .env                        Discord token
 ├── auction_house.db            SQLite database
 │
@@ -44,7 +53,8 @@ Miner Tycon Bot/
 │
 ├── utils/
 │   ├── __init__.py
-│   └── validators.py           Validation & formatting
+│   ├── validators.py           Validation & formatting
+│   └── watcher.py              File system monitoring & auto-restart
 │
 ├── views/
 │   ├── __init__.py
@@ -57,7 +67,9 @@ Miner Tycon Bot/
 │
 └── commands/
     ├── __init__.py
-    └── listings.py             Slash commands
+    ├── listings.py             Slash commands
+    ├── pricing.py              Price tracking commands
+    └── admin.py                Admin-only commands
 ```
 
 ### Module Overview
@@ -67,10 +79,13 @@ Miner Tycon Bot/
 | `config/settings.py` | All constants & pet database |
 | `database/db.py` | SQLite operations & queries |
 | `utils/validators.py` | Input validation & formatting |
+| `utils/watcher.py` | File monitoring with auto-restart notifications |
 | `views/listing.py` | Listing creation UI |
 | `views/manage.py` | Listing management UI |
 | `modals/add_pet.py` | Modal dialog forms |
-| `commands/listings.py` | All slash commands |
+| `commands/listings.py` | User trading commands |
+| `commands/pricing.py` | Price tracking commands |
+| `commands/admin.py` | Admin management commands |
 
 ---
 
@@ -84,18 +99,29 @@ Miner Tycon Bot/
 
 ## ✨ Features
 
-### Phase 1: Onboarding & Help
-- `/help` - Comprehensive help guide
-- `/how-to-trade` - Step-by-step trading tutorial
-- `/pets` - Reference all 13 available pets
-- Enhanced `/search` - Better result formatting
+### User Features
+- **Create Listings** - Add HAVE/WANT offers with quantities
+- **Search** - Find listings by pet name with type filtering
+- **View Listings** - Browse your offers with sorting & filtering
+- **Help System** - Comprehensive guides and tutorials
 
-### Phase 2: Organization & UX
-- **Filters** - Sort listings by type (HAVE/WANT/BOTH)
-- **Sorting** - Organize by date or pet count
-- **Presets** - Quick quantity buttons (1, 10, 50, 100, 1000)
-- **Help Text** - Inline guidance in forms
-- **Search Filtering** - Find offers or requests only
+### Admin Features
+- **Dynamic Admin Management** - Add/remove admins without restart
+- **Listing Moderation** - Delete, edit, or clear user listings
+- **Simple Edit Format** - Edit listings using intuitive "Pet Rarity Qty" format
+- **Multi-Item Editing** - Support for comma-separated items
+
+### Price Tracking
+- **Trade Recording** - Automatically log trades for analysis
+- **Market Overview** - View price trends and statistics
+- **Pet Charts** - Track pricing history per pet
+
+### Technical Features
+- **Auto-Restart** - File watcher automatically restarts bot on code changes
+- **Discord Notifications** - Users notified before auto-restart
+- **Modular Architecture** - Clean separation of concerns
+- **Type Safety** - Full type hints throughout codebase
+- **Error Handling** - Graceful error handling with user feedback
 
 ---
 
@@ -153,11 +179,14 @@ See [GUIDE.md](GUIDE.md) for complete development practices.
 
 ## 📈 Current Stats
 
-- **Total Modules**: 15 Python files
-- **Total LOC**: 1,218 organized lines
-- **Type Coverage**: 90%
+- **Total Commands**: 18 (8 user + 3 pricing + 7 admin)
+- **Total Modules**: 18 Python files
+- **Total LOC**: 1,500+ organized lines
+- **Type Coverage**: 95%
 - **Pet Types**: 13 available
-- **Max Listing Size**: 50 items
+- **Max Listing Size**: 50 items per listing
+- **Auto-Restart**: Enabled with file watcher
+- **Database**: SQLite with transaction support
 
 ---
 

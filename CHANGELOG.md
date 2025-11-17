@@ -4,9 +4,147 @@ All notable changes to the Miner Tycon Bot project.
 
 ## Overview
 
-The project has gone through two major phases of improvements:
+The project has evolved through multiple development phases:
 - **Phase 1** (Session 1-2): Code refactoring + onboarding features
 - **Phase 2** (Session 3): Organization & user experience features
+- **Phase 3** (Session 4): Admin management & price tracking
+- **Phase 4** (Session 5): Auto-restart & simplified UI
+
+---
+
+## Phase 4: Auto-Restart & UI Improvements
+
+### 🔄 File Watcher Auto-Restart
+
+**What Changed**: Bot now automatically restarts when code files change.
+
+**Implementation**:
+- New `utils/watcher.py` module using watchdog library
+- Monitors all `.py` files (excludes `__pycache__` and logs)
+- 2-second cooldown to prevent restart spam
+- Discord notification sent before restart
+- Graceful fallback if watchdog not installed
+
+**Benefits**:
+- No need to manually restart bot during development
+- Reduced downtime when deploying fixes
+- Clear user notification before restart
+- Prevents multiple restarts in quick succession
+
+**Files Modified**:
+- `bot.py` - Initialize file watcher on startup
+- `requirements.txt` - Added `watchdog==4.0.0`
+- `utils/watcher.py` - NEW FILE
+
+---
+
+### 🎨 Admin Edit Listing Simplified
+
+**What Changed**: Admin edit command changed from JSON to simple format.
+
+**Before**:
+```json
+{"Pet": {"Rarity": qty}}
+{"Bramble": {"Legendary": 15, "Mythic": 2}}
+```
+
+**After**:
+```
+Bramble Legendary 15
+Bramble Mythic 2
+Delve Legendary 5
+```
+
+Or comma-separated:
+```
+Bramble Legendary 15, Bramble Mythic 2, Delve Legendary 5
+```
+
+**Features**:
+- Single items on separate lines OR comma-separated
+- Same format as `/create_listing`
+- Supports multiple items in one edit
+- Automatically filters out items with qty 0
+- Intuitive modal dialog interface
+
+**Files Modified**:
+- `modals/add_pet.py` - Redesigned `EditListingModal` class
+- `commands/admin.py` - References updated
+
+---
+
+## Phase 3: Admin Management & Price Tracking
+
+### 👑 Dynamic Admin System
+
+**What Changed**: Admins can now be added/removed without code changes or restart.
+
+**New Commands**:
+- `/admin_add` - Add a new admin user
+- `/admin_remove` - Remove an admin
+- `/admin_list` - View all current admins
+
+**Implementation**:
+- Admins stored in database (not hardcoded)
+- Add/remove triggers instantly
+- No restart required
+- Confirmation dialogs for safety
+
+**Benefits**:
+- Easy admin delegation
+- No need to edit config files
+- No restart downtime
+- Clear audit trail
+
+---
+
+### 🗑️ Listing Moderation Commands
+
+**New Commands**:
+- `/admin_listings` - View all listings in database
+- `/admin_delete_listing` - Remove specific listing
+- `/admin_clear_user_listings` - Clear all listings from user
+- `/admin_edit_listing` - Edit existing listing content
+
+**Implementation**:
+- Confirmation dialogs prevent accidental deletions
+- User ID parameter accepts large Discord IDs (19 digits)
+- Changes logged automatically
+- Clear feedback messages
+
+---
+
+### 📊 Price Tracking System
+
+**New Module**: `commands/pricing.py`
+
+**New Commands**:
+- `/price_market` - View overall market trends
+- `/price_pet` - Get pricing info for specific pet
+- `/price_record` - Manually log a trade
+
+**Features**:
+- Records all trades automatically
+- Tracks price history per pet
+- Calculates average prices
+- Shows market statistics
+
+**Implementation**:
+- New database tables for price tracking
+- Automatic trade recording
+- Historical data aggregation
+- Statistical analysis functions
+
+---
+
+### 📈 Phase 3 Results
+
+| Feature | Commands | Users |
+|---------|----------|-------|
+| Admin Management | 3 | Admins only |
+| Listing Moderation | 4 | Admins only |
+| Price Tracking | 3 | All users |
+| **Total** | **18** | - |
 
 ---
 
@@ -369,11 +507,35 @@ The project now uses a clean documentation structure:
 
 ## Version History
 
-### v1.0 (Current)
+### v2.0 (Current)
 - ✅ Phase 1: Refactoring + Onboarding
 - ✅ Phase 2: Organization + UX
+- ✅ Phase 3: Admin Management + Price Tracking
+- ✅ Phase 4: Auto-Restart + UI Improvements
 
-**Status**: Production Ready
+**Total Commands**: 18 (8 user + 3 pricing + 7 admin)  
+**Total Files**: 18 Python modules across 6 directories  
+**Status**: ✅ Production Ready  
+**Deployment**: GitHub ready with auto-restart enabled
+
+---
+
+## Deployment Files
+
+### Setup & Launch
+- `setup.bat` - One-click installation
+- `start_bot.bat` - Launch bot with logging
+- `requirements.txt` - All dependencies
+- `.env` - Discord token storage (git-ignored)
+- `.gitignore` - GitHub deployment config
+
+### Documentation
+- `README.md` - Quick start & features
+- `README_GITHUB.md` - GitHub-specific documentation
+- `GUIDE.md` - Developer guide
+- `ARCHITECTURE.md` - Technical architecture
+- `SETUP.md` - Setup instructions
+- `CHANGELOG.md` - This file
 
 ---
 
