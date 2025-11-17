@@ -6,6 +6,8 @@ from discord import app_commands
 import logging
 import json
 import sqlite3
+import os
+import sys
 from database.db import get_listing_by_id, delete_listing, update_listing
 
 logger = logging.getLogger(__name__)
@@ -344,4 +346,34 @@ async def setup_admin_commands(tree: app_commands.CommandTree, client: discord.C
             
         except Exception as e:
             logger.error(f"Error in admin_list: {e}", exc_info=True)
+            await interaction.response.send_message(f"❌ Error: {str(e)}", ephemeral=True)
+
+    @tree.command(name='admin_restart', description='Restart the bot (Admin only)')
+    async def admin_restart(interaction: discord.Interaction):
+        """Restart the bot process."""
+        if not is_admin(interaction.user.id):
+            await interaction.response.send_message(
+                "❌ You don't have permission to use this command.",
+                ephemeral=True
+            )
+            return
+
+        try:
+            embed = discord.Embed(
+                title="[RESTART] Bot Restarting",
+                description="Restarting bot process... I'll be back in a moment!",
+                color=discord.Color.blue()
+            )
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+            logger.info(f"[ADMIN] Bot restart triggered by {interaction.user.name}")
+            
+            # Give a moment for the message to send before restarting
+            import asyncio
+            await asyncio.sleep(1)
+            
+            # Restart the bot
+            os.execl(sys.executable, sys.executable, "bot.py")
+            
+        except Exception as e:
+            logger.error(f"Error in admin_restart: {e}", exc_info=True)
             await interaction.response.send_message(f"❌ Error: {str(e)}", ephemeral=True)
