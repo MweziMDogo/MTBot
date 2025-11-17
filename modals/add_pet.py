@@ -339,3 +339,96 @@ class DeleteListingModal(ui.Modal, title="Delete Listing"):  # type: ignore
             await interaction.response.send_message("❌ Please enter a valid listing ID number.", ephemeral=True)
         except Exception as e:
             await interaction.response.send_message(f"❌ Error: {str(e)}", ephemeral=True)
+
+
+class EditListingModal(ui.Modal, title="Edit Listing"):  # type: ignore
+    """Modal for admins to edit any listing (pre-filled with current data)."""
+    
+    def __init__(self, listing_id: int, listing_data: Dict[str, Any]):
+        super().__init__()
+        self.listing_id = listing_id
+        self.listing_data = listing_data
+        
+        # Pre-fill with current values
+        current_haves = listing_data.get('haves', '')
+        current_wants = listing_data.get('wants', '')
+        current_desc = listing_data.get('description', '') or ''
+    
+    haves = ui.TextInput(
+        label="Items They HAVE (JSON format)",
+        placeholder='{"PetName": {"Rarity": qty}} e.g. {"Delve": {"Legendary": 5}}',
+        min_length=0,
+        max_length=1000,
+        required=False,
+        style=discord.TextStyle.paragraph
+    )
+    
+    wants = ui.TextInput(
+        label="Items They WANT (JSON format)",
+        placeholder='{"PetName": {"Rarity": qty}} e.g. {"Bramble": {"Mythic": 2}}',
+        min_length=0,
+        max_length=1000,
+        required=False,
+        style=discord.TextStyle.paragraph
+    )
+    
+    description = ui.TextInput(
+        label="Description (optional)",
+        placeholder="Any notes about the trade...",
+        min_length=0,
+        max_length=500,
+        required=False,
+        style=discord.TextStyle.paragraph
+    )
+    
+    async def on_submit(self, interaction: discord.Interaction) -> None:
+        """Process the modal submission."""
+        try:
+            # Parse JSON if provided
+            new_haves = None
+            new_wants = None
+            
+            if self.haves.value.strip():
+                try:
+                    new_haves = json.loads(self.haves.value)
+                except json.JSONDecodeError:
+                    await interaction.response.send_message(
+                        "❌ Invalid JSON in 'Items They HAVE' field.\nExample: `{\"Delve\": {\"Legendary\": 5}}`",
+                        ephemeral=True
+                    )
+                    return
+            
+            if self.wants.value.strip():
+                try:
+                    new_wants = json.loads(self.wants.value)
+                except json.JSONDecodeError:
+                    await interaction.response.send_message(
+                        "❌ Invalid JSON in 'Items They WANT' field.\nExample: `{\"Bramble\": {\"Mythic\": 2}}`",
+                        ephemeral=True
+                    )
+                    return
+            
+            # Update the listing
+            update_listing(
+                self.listing_id,
+                haves=new_haves or self.listing_data.get('haves'),
+                wants=new_wants or self.listing_data.get('wants'),
+                description=self.description.value if self.description.value.strip() else self.listing_data.get('description')
+            )
+            
+            embed = discord.Embed(
+                title=f"✅ Listing #{self.listing_id} Updated",
+                color=discord.Color.green(),
+                description="The listing has been successfully updated!"
+            )
+            embed.add_field(name="New HAVE", value=new_haves or "Unchanged", inline=False)
+            embed.add_field(name="New WANT", value=new_wants or "Unchanged", inline=False)
+            if self.description.value.strip():
+                embed.add_field(name="New Description", value=self.description.value, inline=False)
+            
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+            logger.info(f"Admin edited listing {self.listing_id}")
+            
+        except Exception as e:
+            logger.error(f"Error editing listing: {e}", exc_info=True)
+            await interaction.response.send_message(f"❌ Error: {str(e)}", ephemeral=True)

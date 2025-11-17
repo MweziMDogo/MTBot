@@ -228,9 +228,9 @@ async def setup_admin_commands(tree: app_commands.CommandTree, client: discord.C
             await interaction.response.send_message(f"❌ Error: {str(e)}", ephemeral=True)
 
     @tree.command(name='admin_edit_listing', description='Edit any listing by ID (Admin only)')
-    @app_commands.describe(listing_id='The listing ID to edit', haves='New HAVE section (JSON format)', wants='New WANT section (JSON format)')
-    async def admin_edit_listing(interaction: discord.Interaction, listing_id: int | None = None, haves: Optional[str] = None, wants: Optional[str] = None):
-        """Edit any listing directly."""
+    @app_commands.describe(listing_id='The listing ID to edit')
+    async def admin_edit_listing(interaction: discord.Interaction, listing_id: int | None = None):
+        """Edit any listing directly using a modal."""
         if not is_admin(interaction.user.id):
             await interaction.response.send_message(
                 "❌ You don't have permission to use this command.",
@@ -248,24 +248,13 @@ async def setup_admin_commands(tree: app_commands.CommandTree, client: discord.C
                 )
                 return
             
-            # Parse JSON inputs
-            new_haves = json.loads(haves) if haves else listing['haves']
-            new_wants = json.loads(wants) if wants else listing['wants']
+            # Import modal here to avoid circular imports
+            from modals.add_pet import EditListingModal
             
-            # Update listing
-            update_listing(listing_id, haves=new_haves, wants=new_wants)
+            # Pass the listing data to the modal
+            modal = EditListingModal(listing_id=listing_id, listing_data=listing)
+            await interaction.response.send_modal(modal)
             
-            await interaction.response.send_message(
-                f"✅ Listing #{listing_id} updated!\n\n**Have:** {new_haves}\n**Want:** {new_wants}",
-                ephemeral=True
-            )
-            logger.info(f"Admin {interaction.user.id} edited listing {listing_id}")
-            
-        except json.JSONDecodeError:
-            await interaction.response.send_message(
-                "❌ Invalid JSON format. Use: `{\"PetName\": {\"Rarity\": quantity}}`",
-                ephemeral=True
-            )
         except Exception as e:
             logger.error(f"Error in admin_edit_listing: {e}", exc_info=True)
             await interaction.response.send_message(f"❌ Error: {str(e)}", ephemeral=True)
