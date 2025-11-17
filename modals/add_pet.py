@@ -6,7 +6,7 @@ import json
 import logging
 from typing import Optional, List, Dict, Any
 from database.db import get_pet_by_name, get_listing_by_id, update_listing, create_listing, delete_listing
-from utils.validators import parse_quantities
+from utils.validators import parse_quantities, parse_pet_quantities
 from config.settings import DB_PATH, MSG_LISTING_UPDATED, MSG_LISTING_DELETED
 
 logger = logging.getLogger(__name__)
@@ -379,13 +379,13 @@ class EditListingModal(ui.Modal, title="Edit Listing"):  # type: ignore
     async def on_submit(self, interaction: discord.Interaction) -> None:
         """Process the modal submission."""
         try:
-            # Parse inputs using the same logic as /create_listing
+            # Parse inputs using the new pet-rarity-quantity format
             new_haves = None
             new_wants = None
             
             if self.haves.value.strip():
                 try:
-                    new_haves = parse_quantities(self.haves.value)
+                    new_haves = parse_pet_quantities(self.haves.value)
                     if not new_haves:
                         await interaction.response.send_message(
                             "❌ No valid items in 'Items They HAVE' field.\nFormat: `Pet Rarity Quantity` (comma-separated)",
@@ -394,14 +394,14 @@ class EditListingModal(ui.Modal, title="Edit Listing"):  # type: ignore
                         return
                 except ValueError as e:
                     await interaction.response.send_message(
-                        f"❌ Error parsing 'Items They HAVE': {str(e)}\nFormat: `Pet Rarity Quantity` (comma-separated)",
+                        f"❌ Error in 'Items They HAVE': {str(e)}",
                         ephemeral=True
                     )
                     return
             
             if self.wants.value.strip():
                 try:
-                    new_wants = parse_quantities(self.wants.value)
+                    new_wants = parse_pet_quantities(self.wants.value)
                     if not new_wants:
                         await interaction.response.send_message(
                             "❌ No valid items in 'Items They WANT' field.\nFormat: `Pet Rarity Quantity` (comma-separated)",
@@ -410,7 +410,7 @@ class EditListingModal(ui.Modal, title="Edit Listing"):  # type: ignore
                         return
                 except ValueError as e:
                     await interaction.response.send_message(
-                        f"❌ Error parsing 'Items They WANT': {str(e)}\nFormat: `Pet Rarity Quantity` (comma-separated)",
+                        f"❌ Error in 'Items They WANT': {str(e)}",
                         ephemeral=True
                     )
                     return
@@ -428,8 +428,16 @@ class EditListingModal(ui.Modal, title="Edit Listing"):  # type: ignore
                 color=discord.Color.green(),
                 description="The listing has been successfully updated!"
             )
-            embed.add_field(name="New HAVE", value=new_haves or "Unchanged", inline=False)
-            embed.add_field(name="New WANT", value=new_wants or "Unchanged", inline=False)
+            
+            # Format the display
+            if new_haves:
+                haves_display = ", ".join([f"{pet} {', '.join([f'{r}:{q}' for r, q in rarities.items()])}" for pet, rarities in new_haves.items()])
+                embed.add_field(name="New HAVE", value=haves_display, inline=False)
+            
+            if new_wants:
+                wants_display = ", ".join([f"{pet} {', '.join([f'{r}:{q}' for r, q in rarities.items()])}" for pet, rarities in new_wants.items()])
+                embed.add_field(name="New WANT", value=wants_display, inline=False)
+            
             if self.description.value.strip():
                 embed.add_field(name="New Description", value=self.description.value, inline=False)
             

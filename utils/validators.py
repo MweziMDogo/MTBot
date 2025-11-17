@@ -86,6 +86,72 @@ def parse_quantities(input_str: str) -> Tuple[bool, Dict[str, int], str]:
     return True, quantities, ""
 
 
+def parse_pet_quantities(input_str: str) -> Dict[str, Dict[str, int]]:
+    """
+    Parse input in format "Pet Rarity Quantity" (comma-separated or line-separated).
+    
+    Args:
+        input_str: String like "Kragg Legendary 10, Grimm Mythic 1" or 
+                   multi-line like "Kragg Legendary 10\nGrimm Mythic 1"
+    
+    Returns:
+        Dictionary of {pet_name: {rarity: quantity}}
+        
+    Raises:
+        ValueError: If format is invalid
+    """
+    from database.db import get_pet_by_name
+    
+    result = {}
+    
+    # Split by comma or newline, whichever appears
+    if '\n' in input_str:
+        entries = [e.strip() for e in input_str.split('\n') if e.strip()]
+    else:
+        entries = [e.strip() for e in input_str.split(',') if e.strip()]
+    
+    for entry in entries:
+        # Format: "Pet Rarity Quantity"
+        parts = entry.split()
+        
+        if len(parts) < 3:
+            raise ValueError(f"Invalid format: '{entry}'. Use 'Pet Rarity Quantity' (e.g., 'Kragg Legendary 10')")
+        
+        pet_name = parts[0]
+        rarity = parts[1]
+        qty_str = parts[2]
+        
+        # Validate pet exists
+        if not get_pet_by_name(pet_name):
+            raise ValueError(f"'{pet_name}' is not a valid pet. Use /pets to see all available pets")
+        
+        # Validate rarity
+        is_valid, error_msg = validate_rarity(rarity)
+        if not is_valid:
+            raise ValueError(error_msg)
+        
+        # Validate quantity
+        is_valid, error_msg = validate_quantity(qty_str)
+        if not is_valid:
+            raise ValueError(error_msg)
+        
+        qty = int(qty_str)
+        
+        # Skip if quantity is 0
+        if qty == 0:
+            continue
+        
+        # Add to result
+        if pet_name not in result:
+            result[pet_name] = {}
+        result[pet_name][rarity] = qty
+    
+    if not result:
+        raise ValueError("No valid items provided")
+    
+    return result
+
+
 def format_quantities(quantities: Dict[str, int]) -> str:
     """
     Format quantities dictionary for display.
