@@ -21,11 +21,25 @@ class GitCommitPoller(threading.Thread):
         super().__init__(daemon=True)
         self.bot = bot
         self.running = True
-        self.last_commit_hash = self._get_current_commit()
+        # Initialize by fetching remote to get latest
+        self._fetch_remote()
+        self.last_local_commit = self._get_current_commit()
+        self.last_remote_commit = self._get_remote_commit()
         self.cooldown_until = 0
         
+    def _fetch_remote(self) -> None:
+        """Fetch from remote to get latest commits."""
+        try:
+            subprocess.run(
+                ['git', 'fetch', 'origin'],
+                capture_output=True,
+                timeout=10
+            )
+        except Exception as e:
+            logger.debug(f"[GIT] Could not fetch from remote: {e}")
+    
     def _get_current_commit(self) -> str:
-        """Get the current git commit hash."""
+        """Get the current git commit hash (HEAD)."""
         try:
             result = subprocess.run(
                 ['git', 'rev-parse', 'HEAD'],
@@ -37,6 +51,21 @@ class GitCommitPoller(threading.Thread):
                 return result.stdout.strip()
         except Exception as e:
             logger.debug(f"Could not get git commit: {e}")
+        return ""
+    
+    def _get_remote_commit(self) -> str:
+        """Get the remote commit hash (origin/main)."""
+        try:
+            result = subprocess.run(
+                ['git', 'rev-parse', 'origin/main'],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            if result.returncode == 0:
+                return result.stdout.strip()
+        except Exception as e:
+            logger.debug(f"Could not get remote commit: {e}")
         return ""
     
     def run(self):
@@ -51,20 +80,28 @@ class GitCommitPoller(threading.Thread):
                 if time.time() < self.cooldown_until:
                     continue
                 
-                current_hash = self._get_current_commit()
+                # Fetch latest from remote
+                self._fetch_remote()
                 
-                # If commit hash changed, trigger restart
-                if current_hash and current_hash != self.last_commit_hash:
-                    logger.warning(f"[GIT] New commit detected: {current_hash[:8]}")
+                local_hash = self._get_current_commit()
+                remote_hash = self._get_remote_commit()
+                
+                # If local is behind remote, trigger restart
+                if remote_hash and local_hash != remote_hash:
+                    logger.warning(f"[GIT] New commit detected: {remote_hash[:8]}")
                     logger.warning("[GIT] Bot will restart in 3 seconds...")
                     
-                    self.last_commit_hash = current_hash
+                    self.last_remote_commit = remote_hash
                     self.cooldown_until = time.time() + 10  # 10 second cooldown
+                    
+                    # Reset to the remote commit and restart
+                    subprocess.run(['git', 'reset', '--hard', 'origin/main'], timeout=10)
                     
                     # Restart in separate thread
                     restart_thread = threading.Thread(target=self._restart_bot_sync)
                     restart_thread.daemon = True
                     restart_thread.start()
+                    return  # Exit polling thread after restart
                     
             except Exception as e:
                 logger.debug(f"[GIT] Polling error: {e}")
