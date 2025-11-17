@@ -55,34 +55,45 @@ class GitCommitHandler(FileSystemEventHandler):
             time.sleep(2)
             
             # Try to send notification if bot is available
-            if self.bot:
+            if self.bot and self.bot.guilds:
                 try:
                     import asyncio
+                    sent_count = 0
                     # Try to schedule notification in bot's event loop if available
                     for guild in self.bot.guilds:
+                        if sent_count >= 1:  # Only send to first guild to avoid spam
+                            break
                         for channel in guild.text_channels:
                             try:
+                                # Check if bot has permission to send messages
+                                if not channel.permissions_for(guild.me).send_messages:
+                                    continue
+                                
                                 # Create task in bot's event loop
                                 future = asyncio.run_coroutine_threadsafe(
                                     channel.send(embed=discord.Embed(
-                                        title="⚙️ Bot Restarting",
+                                        title="[UPDATE] Bot Restarting",
                                         description="Updating bot code... I'll be back in a moment!",
                                         color=discord.Color.blue()
                                     )),
                                     self.bot.loop
                                 )
-                                future.result(timeout=1)
+                                future.result(timeout=2)
+                                logger.info(f"[GIT] Sent restart notification to {channel.name}")
+                                sent_count += 1
                                 break  # Send to first available channel per guild
                             except Exception as e:
-                                logger.debug(f"Could not send notification: {e}")
+                                logger.debug(f"Could not send to {channel.name}: {e}")
                                 continue
                 except Exception as e:
-                    logger.debug(f"Skipping notification: {e}")
+                    logger.debug(f"[GIT] Skipping notification: {e}")
+            else:
+                logger.info("[GIT] No guilds connected - skipping notification")
         except Exception as e:
-            logger.error(f"Error during restart: {e}")
+            logger.error(f"[GIT] Error during restart: {e}")
         finally:
             # Restart the bot process
-            logger.info("Restarting bot...")
+            logger.info("[GIT] Restarting bot...")
             os.execl(sys.executable, sys.executable, "bot.py")
 
 
