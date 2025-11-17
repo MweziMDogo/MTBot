@@ -5,6 +5,7 @@ import sys
 import time
 import subprocess
 import logging
+import threading
 from pathlib import Path
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
@@ -13,40 +14,60 @@ from discord.ext import commands
 
 logger = logging.getLogger(__name__)
 
-class GitCommitHandler(FileSystemEventHandler):
-    """Handle git commits and trigger bot restart."""
+class GitCommitPoller(threading.Thread):
+    """Poll git for new commits and trigger restart."""
     
     def __init__(self, bot=None):
+        super().__init__(daemon=True)
         self.bot = bot
-        self.last_commit_time = time.time()
-        self.cooldown = 3  # Prevent multiple restarts in quick succession
-        self.git_dir = Path('.git')
+        self.running = True
+        self.last_commit_hash = self._get_current_commit()
+        self.cooldown_until = 0
         
-    def on_modified(self, event):
-        """Called when a file is modified."""
-        if event.is_directory:
-            return
+    def _get_current_commit(self) -> str:
+        """Get the current git commit hash."""
+        try:
+            result = subprocess.run(
+                ['git', 'rev-parse', 'HEAD'],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            if result.returncode == 0:
+                return result.stdout.strip()
+        except Exception as e:
+            logger.debug(f"Could not get git commit: {e}")
+        return ""
+    
+    def run(self):
+        """Poll for git changes every 5 seconds."""
+        logger.info("[GIT] Polling for commits every 5 seconds...")
         
-        # Only watch git index and HEAD files (these change on commits)
-        event_path = Path(event.src_path)
-        
-        # Trigger on git index changes (happens during git operations)
-        if event_path.name in ['index', 'HEAD', 'COMMIT_EDITMSG']:
-            # Check if this is actually a commit (index file modification)
-            current_time = time.time()
-            if current_time - self.last_commit_time < self.cooldown:
-                return
-            
-            self.last_commit_time = current_time
-            
-            logger.warning("[GIT] Commit detected")
-            logger.warning("[GIT] Bot will restart in 3 seconds...")
-            
-            # Restart in a separate thread to avoid event loop issues
-            import threading
-            restart_thread = threading.Thread(target=self._restart_bot_sync)
-            restart_thread.daemon = True
-            restart_thread.start()
+        while self.running:
+            try:
+                time.sleep(5)
+                
+                # Check cooldown
+                if time.time() < self.cooldown_until:
+                    continue
+                
+                current_hash = self._get_current_commit()
+                
+                # If commit hash changed, trigger restart
+                if current_hash and current_hash != self.last_commit_hash:
+                    logger.warning(f"[GIT] New commit detected: {current_hash[:8]}")
+                    logger.warning("[GIT] Bot will restart in 3 seconds...")
+                    
+                    self.last_commit_hash = current_hash
+                    self.cooldown_until = time.time() + 10  # 10 second cooldown
+                    
+                    # Restart in separate thread
+                    restart_thread = threading.Thread(target=self._restart_bot_sync)
+                    restart_thread.daemon = True
+                    restart_thread.start()
+                    
+            except Exception as e:
+                logger.debug(f"[GIT] Polling error: {e}")
     
     def _restart_bot_sync(self):
         """Synchronously restart the bot (called from separate thread)."""
@@ -73,7 +94,7 @@ class GitCommitHandler(FileSystemEventHandler):
                                 future = asyncio.run_coroutine_threadsafe(
                                     channel.send(embed=discord.Embed(
                                         title="[UPDATE] Bot Restarting",
-                                        description="Updating bot code... I'll be back in a moment!",
+                                        description="Detected new code update... I'll be back in a moment!",
                                         color=discord.Color.blue()
                                     )),
                                     self.bot.loop
@@ -98,26 +119,18 @@ class GitCommitHandler(FileSystemEventHandler):
 
 
 def start_file_watcher(bot=None):
-    """Start watching for git commits."""
+    """Start polling for git commits."""
     try:
-        from watchdog.observers import Observer
-        from watchdog.events import FileSystemEventHandler
-        
         # Check if .git directory exists
         if not Path('.git').exists():
             logger.warning("Git repository not found - auto-restart disabled")
             return None
         
-        event_handler = GitCommitHandler(bot)
-        observer = Observer()
-        
-        # Watch only the .git directory for commits
-        observer.schedule(event_handler, path='.git', recursive=True)
-        observer.start()
+        poller = GitCommitPoller(bot)
+        poller.start()
         
         logger.info("[GIT] Watcher started - bot will auto-restart on git commits")
-        return observer
-    except ImportError:
-        logger.warning("watchdog not installed - auto-restart disabled")
-        logger.warning("Install it with: pip install watchdog")
+        return poller
+    except Exception as e:
+        logger.error(f"[GIT] Error starting watcher: {e}")
         return None
