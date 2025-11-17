@@ -39,8 +39,8 @@ class GitCommitHandler(FileSystemEventHandler):
             
             self.last_commit_time = current_time
             
-            logger.warning("🔄 Git commit detected")
-            logger.warning("Bot will restart in 3 seconds...")
+            logger.warning("[GIT] Commit detected")
+            logger.warning("[GIT] Bot will restart in 3 seconds...")
             
             # Restart in a separate thread to avoid event loop issues
             import threading
@@ -104,7 +104,7 @@ def start_file_watcher(bot=None):
         observer.schedule(event_handler, path='.git', recursive=True)
         observer.start()
         
-        logger.info("🔄 Git watcher started - bot will auto-restart on git commits")
+        logger.info("[GIT] Watcher started - bot will auto-restart on git commits")
         return observer
     except ImportError:
         logger.warning("watchdog not installed - auto-restart disabled")
