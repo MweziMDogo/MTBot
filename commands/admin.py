@@ -8,6 +8,7 @@ import json
 import sqlite3
 import os
 import sys
+import subprocess
 from database.db import get_listing_by_id, delete_listing, update_listing
 
 logger = logging.getLogger(__name__)
@@ -371,8 +372,10 @@ async def setup_admin_commands(tree: app_commands.CommandTree, client: discord.C
             import asyncio
             await asyncio.sleep(1)
             
-            # Restart the bot
-            os.execl(sys.executable, sys.executable, "bot.py")
+            # Restart the bot using subprocess
+            subprocess.Popen([sys.executable, "bot.py"])
+            # Exit current process
+            os._exit(0)
             
         except Exception as e:
             logger.error(f"Error in admin_restart: {e}", exc_info=True)
